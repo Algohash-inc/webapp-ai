@@ -139,7 +139,7 @@ function unicodeToChar(text: string) {
   })
 }
 
-const handleStream = (
+const handleStream = async (
   response: Response,
   onData: IOnData,
   onCompleted?: IOnCompleted,
@@ -152,101 +152,113 @@ const handleStream = (
   onNodeStarted?: IOnNodeStarted,
   onNodeFinished?: IOnNodeFinished,
 ) => {
-  if (!response.ok)
-    throw new Error('Network response was not ok')
+  if (!response.ok) throw new Error('Network response was not ok')
 
   const reader = response.body?.getReader()
   const decoder = new TextDecoder('utf-8')
   let buffer = ''
-  let bufferObj: Record<string, any>
   let isFirstMessage = true
-  function read() {
-    let hasError = false
-    reader?.read().then((result: any) => {
-      if (result.done) {
-        onCompleted && onCompleted()
-        return
-      }
-      buffer += decoder.decode(result.value, { stream: true })
-      const lines = buffer.split('\n')
+
+  const processMessage = (message: string) => {
+    let bufferObj: Record<string, any>
+
+    if (message.startsWith('data: ')) {
       try {
-        lines.forEach((message) => {
-          if (message.startsWith('data: ')) { // check if it starts with data:
-            try {
-              bufferObj = JSON.parse(message.substring(6)) as Record<string, any>// remove data: and parse as json
-            }
-            catch (e) {
-              // mute handle message cut off
-              onData('', isFirstMessage, {
-                conversationId: bufferObj?.conversation_id,
-                messageId: bufferObj?.message_id,
-              })
-              return
-            }
-            if (bufferObj.status === 400 || !bufferObj.event) {
-              onData('', false, {
-                conversationId: undefined,
-                messageId: '',
-                errorMessage: bufferObj?.message,
-                errorCode: bufferObj?.code,
-              })
-              hasError = true
-              onCompleted?.(true)
-              return
-            }
-            if (bufferObj.event === 'message' || bufferObj.event === 'agent_message') {
-              // can not use format here. Because message is splited.
-              onData(unicodeToChar(bufferObj.answer), isFirstMessage, {
-                conversationId: bufferObj.conversation_id,
-                taskId: bufferObj.task_id,
-                messageId: bufferObj.id,
-              })
-              isFirstMessage = false
-            }
-            else if (bufferObj.event === 'agent_thought') {
-              onThought?.(bufferObj as ThoughtItem)
-            }
-            else if (bufferObj.event === 'message_file') {
-              onFile?.(bufferObj as VisionFile)
-            }
-            else if (bufferObj.event === 'message_end') {
-              onMessageEnd?.(bufferObj as MessageEnd)
-            }
-            else if (bufferObj.event === 'message_replace') {
-              onMessageReplace?.(bufferObj as MessageReplace)
-            }
-            else if (bufferObj.event === 'workflow_started') {
-              onWorkflowStarted?.(bufferObj as WorkflowStartedResponse)
-            }
-            else if (bufferObj.event === 'workflow_finished') {
-              onWorkflowFinished?.(bufferObj as WorkflowFinishedResponse)
-            }
-            else if (bufferObj.event === 'node_started') {
-              onNodeStarted?.(bufferObj as NodeStartedResponse)
-            }
-            else if (bufferObj.event === 'node_finished') {
-              onNodeFinished?.(bufferObj as NodeFinishedResponse)
-            }
-          }
-        })
-        buffer = lines[lines.length - 1]
-      }
-      catch (e) {
+        bufferObj = JSON.parse(message.substring(6))
+
+        if (bufferObj.status === 400 || !bufferObj.event) {
+          onData('', false, {
+            conversationId: undefined,
+            messageId: '',
+            errorMessage: bufferObj?.message,
+            errorCode: bufferObj?.code,
+          })
+          return true // Indicates an error occurred
+        }
+
+        switch (bufferObj.event) {
+          case 'message':
+          case 'agent_message':
+            onData(unicodeToChar(bufferObj.answer), isFirstMessage, {
+              conversationId: bufferObj.conversation_id,
+              taskId: bufferObj.task_id,
+              messageId: bufferObj.id,
+            })
+            isFirstMessage = false
+            break
+          case 'agent_thought':
+            onThought?.(bufferObj as ThoughtItem)
+            break
+          case 'message_file':
+            onFile?.(bufferObj as VisionFile)
+            break
+          case 'message_end':
+            onMessageEnd?.(bufferObj as MessageEnd)
+            break
+          case 'message_replace':
+            onMessageReplace?.(bufferObj as MessageReplace)
+            break
+          case 'workflow_started':
+            onWorkflowStarted?.(bufferObj as WorkflowStartedResponse)
+            break
+          case 'workflow_finished':
+            onWorkflowFinished?.(bufferObj as WorkflowFinishedResponse)
+            break
+          case 'node_started':
+            onNodeStarted?.(bufferObj as NodeStartedResponse)
+            break
+          case 'node_finished':
+            onNodeFinished?.(bufferObj as NodeFinishedResponse)
+            break
+        }
+      } catch (e) {
         onData('', false, {
           conversationId: undefined,
           messageId: '',
           errorMessage: `${e}`,
         })
-        hasError = true
-        onCompleted?.(true)
-        return
+        return true // Indicates an error occurred
       }
-      if (!hasError)
-        read()
-    })
+    }
+
+    return false // No error
   }
-  read()
+
+  const read = async () => {
+    while (true) {
+      const { done, value } = await reader?.read() || { done: true }
+
+      if (done) {
+        onCompleted && onCompleted()
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+
+      for (const message of lines.slice(0, -1)) {
+        if (processMessage(message)) {
+          onCompleted?.(true)
+          return
+        }
+      }
+
+      buffer = lines[lines.length - 1]
+    }
+  }
+
+  try {
+    await read()
+  } catch (e) {
+    onData('', false, {
+      conversationId: undefined,
+      messageId: '',
+      errorMessage: `${e}`,
+    })
+    onCompleted?.(true)
+  }
 }
+
 
 const baseFetch = (url: string, fetchOptions: any, { needAllResponseContent }: IOtherOptions) => {
   const options = Object.assign({}, baseOptions, fetchOptions)
