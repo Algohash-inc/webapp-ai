@@ -172,7 +172,7 @@ const Chat: FC<IChatProps> = ({
               }
               <Textarea
                 className={`
-                block w-full px-2 pr-[118px] py-[7px] leading-5 max-h-none text-sm text-gray-200 outline-none appearance-none resize-none bg-gray-800 placeholder-gray-400
+               block w-full px-2 pr-[118px] py-[7px] leading-5 max-h-none text-base text-gray-200 outline-none appearance-none resize-none bg-gray-800 placeholder-gray-400
 
 
                   ${visionConfig?.enabled && 'pl-12'}
