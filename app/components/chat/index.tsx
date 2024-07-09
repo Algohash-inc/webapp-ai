@@ -146,7 +146,7 @@ const Chat: FC<IChatProps> = ({
       {
         !isHideSendInput && (
           <div className={cn(!feedbackDisabled && '!left-3.5 !right-3.5', 'absolute z-10 bottom-0 left-0 right-0')}>
-            <div className='p-[5.5px] max-h-[150px] bg-white border-[1.5px] border-gray-200 rounded-xl overflow-y-auto'>
+            <div className='p-[5.5px] max-h-[150px] bg-gray-800 border-[1.5px] border-gray-600 rounded-xl overflow-y-auto'>
               {
                 visionConfig?.enabled && (
                   <>
@@ -156,7 +156,7 @@ const Chat: FC<IChatProps> = ({
                         onUpload={onUpload}
                         disabled={files.length >= visionConfig.number_limits}
                       />
-                      <div className='mx-1 w-[1px] h-4 bg-black/5' />
+                      <div className='mx-1 w-[1px] h-4 bg-white/10' />
                     </div>
                     <div className='pl-[52px]'>
                       <ImageList
@@ -172,7 +172,9 @@ const Chat: FC<IChatProps> = ({
               }
               <Textarea
                 className={`
-                  block w-full px-2 pr-[118px] py-[7px] leading-5 max-h-none text-sm text-gray-700 outline-none appearance-none resize-none
+                block w-full px-2 pr-[118px] py-[7px] leading-5 max-h-none text-sm text-gray-200 outline-none appearance-none resize-none bg-gray-800 placeholder-gray-400
+
+
                   ${visionConfig?.enabled && 'pl-12'}
                 `}
                 value={query}
@@ -182,7 +184,7 @@ const Chat: FC<IChatProps> = ({
                 autoSize
               />
               <div className="absolute bottom-2 right-2 flex items-center h-8">
-                <div className={`${s.count} mr-4 h-5 leading-5 text-sm bg-gray-50 text-gray-500`}>{query.trim().length}</div>
+                <div className={`${s.count} mr-4 h-5 leading-5 text-sm bg-gray-800 text-gray-200`}>{query.trim().length}</div>
                 <Tooltip
                   selector='send-tip'
                   htmlContent={
